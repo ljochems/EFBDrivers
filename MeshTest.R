@@ -1,4 +1,4 @@
- 
+
 veg_utm <- read.csv("FullTransectUTM.csv")
 veg_utm <- subset(veg_utm, select= -X.1)
 
