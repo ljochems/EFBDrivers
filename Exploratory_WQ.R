@@ -57,16 +57,26 @@ plot(efb_veg$Hydrc__~efb_veg$stndn_) # tbe?
 plot(efb_veg$Hydrc__~efb_veg$dtrts_p)
 
 plot(efb_veg$Hydrc__~efb_veg$Phrgmt_) #surprised there aren't many obs, maybe too early for efb colonization
-#OR phrag jus aint great strcuture... 
+#OR phrag just isn't great strcuture... 
 plot(efb_veg$Hydrc__~efb_veg$Phrgmt_)
 plot(efb_veg$Hydrc__~efb_veg$Typh_ng)
 plot(efb_veg$Hydrc__~efb_veg$Typh_gl)
 plot(efb_veg$Hydrc__~efb_veg$Typ____)
 plot(efb_veg$Hydrc__~efb_veg$typh_cm)# more noisy than expected 
 
+plot(efb_veg$Hydrc__~efb_veg$Phrgmt_)
 
-
-
+#
+plot(efb_human$Hydrc__~efb_human$NEAR_DIST)
+plot(efb_human$Hydrc__~efb_human$human_mod) #not too surprising
+plot(efb_human$Hydrc__~efb_human$MeanFetch)
+plot(efb_human$Hydrc__~efb_human$MeanREI)
+plot(efb_human$Hydrc__~efb_human$cl)
+plot(efb_human$Hydrc__~efb_human$tnedit)
+plot(efb_human$Hydrc__~efb_human$tpedit)
+plot(efb_human$Hydrc__~efb_human$temp_c)
+plot(efb_human$Hydrc__~efb_human$pH)
+plot(efb_human$Hydrc__~efb_human$diss_o2)
 
 #####
 #basis functions
