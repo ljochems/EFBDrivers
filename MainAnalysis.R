@@ -5,6 +5,15 @@ require('plotly')
 require('lattice')
 require('grid')
 require('gridExtra')
+require('raster')
+require('plotly')
+require('dplyr')
+require('tidyr')
+require('tidyverse')
+require('sp')
+require('rgdal')
+
+setwd("/home/ljochems/PrelimHurdleModel/")
 
 efb_data <- read.csv("FullData2011-18_HumanVars_NoWQ.csv")
 utm <- read.csv("FullTransectUTM.csv")
@@ -12,19 +21,25 @@ utm <- read.csv("FullTransectUTM.csv")
 efb_data$UTM_X <- utm$UTM_X
 efb_data$UTM_Y <- utm$UTM_Y
 
+#need to divide percent cover by 100 for model purposes 
+efb_data$EFB_cover <- efb_data$Hydrc__/100
+efb_data$typ_cover <- efb_data$typh_cm/100
+
 plot(efb_data$hyd_bin~efb_data$wtr_dp_)
-plot(efb_data$Hydrc__efb_data$wtr_dp_)
+plot(efb_data$EFB_cover~efb_data$wtr_dp_)
 plot(efb_data$hyd_bin~efb_data$NEAR_DIST)
-plot(efb_data$Hydrc__~efb_data$NEAR_DIST)
-plot(efb_data$hyd_bin~efb_data$typh_cm)
-plot(efb_data$Hydrc__~efb_data$typh_cm)
+plot(efb_data$EFB_cover~efb_data$NEAR_DIST)
+plot(efb_data$hyd_bin~efb_data$typ_cover)
+plot(efb_data$EFB_cover~efb_data$typ_cover)
 plot(efb_data$hyd_bin~efb_data$MeanFetch)
-plot(efb_data$Hydrc__~efb_data$MeanFetch)
+plot(efb_data$EFB_cover~efb_data$MeanFetch)
+#some of these relationships are not linear, nor necessarily quadratc...
+#exponential? 
 
 
 ### Inputs for the hurdle models
 ###################################################
-##building mesh with full data
+######-----mesh building----#####
 GLbuffer <- shapefile("Great_Lakes_Buffer.shp")
 proj4string(GLbuffer) <- "+proj=longlat +datum=WGS84 +no_defs"
 GL_utm <- spTransform(GLbuffer, CRS("+proj=utm +zone=16,17 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0"))
@@ -42,7 +57,6 @@ dup
 # full_veg[c(1068:1070),]
 # # discard duplicate points, different year?
 # full_veg <- full_veg[-as.numeric(row.names(dup)), ]
-
 
 # distance between points
 dis <- as.matrix(dist(coordinates(efb_data[, c(74,75)])))
@@ -99,7 +113,7 @@ print("The first node with a nonzero weight"); nzero_wt
 #####-----create inla stacks-----##### 
 #create beta (y) amd Bernoulli (z) response vars (from Juanmi's code)
 z <- as.numeric(efb_data$hyd_bin)
-y <- ifelse(efb_data$Hydrc__ > 0, yes=efb_data$Hydrc__,no = NA)
+y <- ifelse(efb_data$EFB_cover > 0, yes=efb_data$EFB_cover,no = NA)
 
 #need to fit with intercept, need to provide response variable as list
 #stack for Beta process (EFB cover)
@@ -107,7 +121,7 @@ stack.EFB_y <- inla.stack(data = list(alldata = cbind(y,NA)),
                           A = list(A_matrix, 1),
                           effects = list(s.index_mY = spde$n.spde,
                                          list(b0Y = rep(1, nrow(efb_data)),
-                                              data.frame(depth=scale(efb_data$wtr_dp_)),data.frame(typha=scale(efb_data$typh_cm)),
+                                              data.frame(depth=scale(efb_data$wtr_dp_)),data.frame(typha=scale(efb_data$typ_cover)),
                                               data.frame(boats=scale(efb_data$NEAR_DIST)), data.frame(fetch=scale(efb_data$MeanFetch)),
                                               idY = rep(1,nrow(efb_data)), idY2 = rep(1,nrow(efb_data)),idY3 = rep(1,nrow(efb_data)),
                                               idY4 = rep(1,nrow(efb_data)))), 
@@ -119,7 +133,7 @@ stack.EFB_z <- inla.stack(data = list(alldata = cbind(NA,z)),
                           A = list(A_matrix, 1),
                           effects = list(s.index_mZ = spde$n.spde,
                                          list(b0Z = rep(1, nrow(efb_data)),
-                                              data.frame(depth=scale(efb_data$wtr_dp_)),data.frame(typha=scale(efb_data$typh_cm)),
+                                              data.frame(depth=scale(efb_data$wtr_dp_)),data.frame(typha=scale(efb_data$typ_cover)),
                                               data.frame(boats=scale(efb_data$NEAR_DIST)), data.frame(fetch=scale(efb_data$MeanFetch)),
                                               idZ = rep(1,nrow(efb_data)), idY2 = rep(1,nrow(efb_data)),idY3 = rep(1,nrow(efb_data)),
                                               idY4 = rep(1,nrow(efb_data)))), 
