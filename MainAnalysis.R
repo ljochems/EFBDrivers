@@ -13,7 +13,7 @@ require('tidyverse')
 require('sp')
 require('rgdal')
 
-setwd("/home/ljochems/PrelimHurdleModel/")
+#setwd("/home/ljochems/PrelimHurdleModel/")
 
 efb_data <- read.csv("FullData2011-18_HumanVars_NoWQ.csv")
 utm <- read.csv("FullTransectUTM.csv")
@@ -33,7 +33,7 @@ plot(efb_data$hyd_bin~efb_data$typ_cover)
 plot(efb_data$EFB_cover~efb_data$typ_cover)
 plot(efb_data$hyd_bin~efb_data$MeanFetch)
 plot(efb_data$EFB_cover~efb_data$MeanFetch)
-#some of these relationships are not linear, nor necessarily quadratc...
+#some of these relationships are not linear, nor necessarily quadratic...
 #exponential? 
 
 
@@ -115,6 +115,21 @@ print("The first node with a nonzero weight"); nzero_wt
 z <- as.numeric(efb_data$hyd_bin)
 y <- ifelse(efb_data$EFB_cover > 0, yes=efb_data$EFB_cover,no = NA)
 
+y_noNA <- y[!is.na(y)]
+#no zeros, but a few 1's 
+#need censoring value to deal with 1 (100 % cover) and 
+#small observed 0.5 % cover
+#represent these as exactly 0 and 1, from inla.doc('^beta$')
+#changed due to weird issue with censor value in inla() hurdle model
+#instead just shave off value from 1's 
+cens <- 0.001
+#y_noNA[y_noNA <= cens] <- 0
+y_noNA[y_noNA >= 1-cens] <- 1-cens
+
+#apply to real y 
+y[y >= 1-cens] <- 1-cens
+
+
 #need to fit with intercept, need to provide response variable as list
 #stack for Beta process (EFB cover)
 stack.EFB_y <- inla.stack(data = list(alldata = cbind(y,NA)), 
@@ -135,8 +150,8 @@ stack.EFB_z <- inla.stack(data = list(alldata = cbind(NA,z)),
                                          list(b0Z = rep(1, nrow(efb_data)),
                                               data.frame(depth=scale(efb_data$wtr_dp_)),data.frame(typha=scale(efb_data$typ_cover)),
                                               data.frame(boats=scale(efb_data$NEAR_DIST)), data.frame(fetch=scale(efb_data$MeanFetch)),
-                                              idZ = rep(1,nrow(efb_data)), idY2 = rep(1,nrow(efb_data)),idY3 = rep(1,nrow(efb_data)),
-                                              idY4 = rep(1,nrow(efb_data)))), 
+                                              idZ = rep(1,nrow(efb_data)), idZ2 = rep(1,nrow(efb_data)),idZ3 = rep(1,nrow(efb_data)),
+                                              idZ4 = rep(1,nrow(efb_data)))), 
                           tag = "Bernoulli (EFB Occurence)")
 #high corr bw fetch and REI, so just use fetch for now 
 
@@ -155,18 +170,22 @@ formula_all <- alldata ~ 0 + b0Y + b0Z +
   f(s.index_mZ, copy = "s.index_mY", hyper = list(beta = list(fixed = FALSE))) + 
   f(idY, depth, hyper = FALSE) + 
   f(idZ, depth, hyper = FALSE) +
-  f(idY, typha, hyper = FALSE) + 
-  f(idZ, typha, hyper = FALSE) +
-  f(idY, boats, hyper = FALSE) + 
-  f(idZ, boats, hyper = FALSE) +
-  f(idY, fetch, hyper = FALSE) + 
-  f(idZ, fetch, hyper = FALSE) 
+  f(idY2, typha, hyper = FALSE) + 
+  f(idZ2, typha, hyper = FALSE) +
+  f(idY3, boats, hyper = FALSE) + 
+  f(idZ3, boats, hyper = FALSE) +
+  f(idY4, fetch, hyper = FALSE) + 
+  f(idZ4, fetch, hyper = FALSE) 
+#consider adding human mod binomial predictor (model='iid')
+#as juanmi did in his paper 
 
 #model to explore spatial error deviations from intercept of response variable 
 EFB.hurdlemodel.inla <- inla(formula_all,
                               data = inla.stack.data(stackm),
                               control.predictor = list(A = inla.stack.A(stackm), link = c(rep(1,length(y)), rep(2,length(z))), compute = TRUE),
                               control.compute = list(dic = T, waic = T, config = T), family = c("beta", "binomial"), verbose = T)
+# control.family = list(beta.censor.value = cens) seems confusing for joint hurdlemodel distribution 
+#instead just took off a little bit from 1's 
 EFB.hurdlemodel.inla <- summary(EFB.hurdlemodel.inla)
 saveRDS(EFB.hurdlemodel.inla, "PrelimHurdleModel.rds")
 
