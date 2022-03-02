@@ -166,6 +166,7 @@ formula_spatial <- alldata ~ 0 + b0Y + b0Z +
   f(s.index_mZ, copy = "s.index_mY", hyper = list(beta = list(fixed = FALSE)))
 
 formula_all <- alldata ~ 0 + b0Y + b0Z + 
+  depth + typha + boats + fetch +
   f(s.index_mY,model=spde) +
   f(s.index_mZ, copy = "s.index_mY", hyper = list(beta = list(fixed = FALSE))) + 
   f(idY, depth, hyper = FALSE) + 
@@ -179,15 +180,35 @@ formula_all <- alldata ~ 0 + b0Y + b0Z +
 #consider adding human mod binomial predictor (model='iid')
 #as juanmi did in his paper 
 
+# formula_all <- alldata ~ 0 + b0Y + b0Z + 
+#   f(s.index_mY,model=spde) +
+#   f(s.index_mZ, copy = "s.index_mY", hyper = list(beta = list(fixed = FALSE))) + 
+#   f(idY, depth, hyper = FALSE) + 
+#   f(idZ, depth, hyper = FALSE) +
+#   f(idY2, typha, hyper = FALSE) + 
+#   f(idZ2, typha, hyper = FALSE) +
+#   f(idY3, boats, hyper = FALSE) + 
+#   f(idZ3, boats, hyper = FALSE) +
+#   f(idY4, fetch, hyper = FALSE) + 
+#   f(idZ4, fetch, hyper = FALSE) 
+# #consider adding human mod binomial predictor (model='iid')
+
+
 #model to explore spatial error deviations from intercept of response variable 
 EFB.hurdlemodel.inla <- inla(formula_all,
                               data = inla.stack.data(stackm),
                               control.predictor = list(A = inla.stack.A(stackm), link = c(rep(1,length(y)), rep(2,length(z))), compute = TRUE),
-                              control.compute = list(dic = T, waic = T, config = T), family = c("beta", "binomial"), verbose = T)
+                              control.compute = list(dic = T, waic = T, config = T), family = c("beta", "zeroinflatedbinomial"),
+                              control.family = list(list(link = 'logit'), list(link = 'logit')), verbose = T)
 # control.family = list(beta.censor.value = cens) seems confusing for joint hurdlemodel distribution 
 #instead just took off a little bit from 1's 
+#control.family(list(control.link('logit') or loglog cloglog
+#cloglog gives same results... trying other links 
+#control.compute=list(return.marginals.predictor=TRUE)
+#control.family(list(control.link('logit')))
+#control.inla = list(strategy="gaussian")? 
 EFB.hurdlemodel.inla <- summary(EFB.hurdlemodel.inla)
-saveRDS(EFB.hurdlemodel.inla, "PrelimHurdleModel.rds")
+saveRDS(EFB.hurdlemodel.inla, "PrelimHurdleModel_fixed.rds")
 
 #one way to save model object, but need to specify certain findings to troubleshoot 
 EFB.hurdlemodel.inla.complete <- list(summary.fixed = EFB.hurdlemodel.inla$summary.fixed,
@@ -200,20 +221,21 @@ EFB.hurdlemodel.inla.complete <- list(summary.fixed = EFB.hurdlemodel.inla$summa
                                       marginals.spde2.blc = EFB.hurdlemodel.inla$marginals.spde2.blc,
                                       marginals.spde3.blc = EFB.hurdlemodel.inla$marginals.spde3.blc,
                                       internal.marginals.hyperpar = EFB.hurdlemodel.inla$internal.marginals.hyperpar)
-save(EFB.hurdlemodel.inla.complete, file="PrelimHurdleModelComplete.Rdata") 
+saveRDS(EFB.hurdlemodel.inla.complete, file="PrelimHurdleModelComplete_fixed.rds") 
+#not sure why this isn't saving...
 
 #to obtain range of spatial error terms across the nodes 
-length(EFB.hurdlemodel.inla$summary.random$spatial.field$mean)
-spatial_error <- range(EFB.hurdlemodel.inla$summary.random$spatial.field$mean)
-print("Range of Spatial Errors"); spatial_error 
-
-# project the spatial random effect
-gproj <- inla.mesh.projector(mesh1)
-g.mean <- inla.mesh.project(gproj, EFB.hurdlemodel.inla$summary.random$spatial.field$mean)
-g.sd <- inla.mesh.project(gproj, EFB.hurdlemodel.inla$summary.random$spatial.field$sd)
-grid.arrange(levelplot(g.mean, scales=list(draw=F), xlab='', ylab='', main='mean',col.regions=terrain.colors(16)),
-             levelplot(g.sd, scal=list(draw=F), xla='', yla='', main='sd',col.regions=terrain.colors(16)),nrow=1)
-par(mfrow = c(1, 2))
+# length(EFB.hurdlemodel.inla$summary.random$spatial.field$mean)
+# spatial_error <- range(EFB.hurdlemodel.inla$summary.random$spatial.field$mean)
+# print("Range of Spatial Errors"); spatial_error 
+# 
+# # project the spatial random effect
+# gproj <- inla.mesh.projector(mesh1)
+# g.mean <- inla.mesh.project(gproj, EFB.hurdlemodel.inla$summary.random$spatial.field$mean)
+# g.sd <- inla.mesh.project(gproj, EFB.hurdlemodel.inla$summary.random$spatial.field$sd)
+# grid.arrange(levelplot(g.mean, scales=list(draw=F), xlab='', ylab='', main='mean',col.regions=terrain.colors(16)),
+#              levelplot(g.sd, scal=list(draw=F), xla='', yla='', main='sd',col.regions=terrain.colors(16)),nrow=1)
+# par(mfrow = c(1, 2))
 
 #not sure what's happening? 
 
@@ -253,7 +275,6 @@ plot(fitted,residuals,main=('Residuals vs Fitted (Including spatial term)')); ab
 # denominator <- sum((observed - meanOb)^2)
 # r2<- (numerator) / (denominator)
 # print('R2');r2
-
 
 
 
