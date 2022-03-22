@@ -12,6 +12,7 @@ require('tidyr')
 require('tidyverse')
 require('sp')
 require('rgdal')
+library(lme4)
 
 #setwd("/home/ljochems/PrelimHurdleModel/")
 

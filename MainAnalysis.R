@@ -13,7 +13,7 @@ require('tidyverse')
 require('sp')
 require('rgdal')
 
-#setwd("/home/ljochems/PrelimHurdleModel/")
+setwd("/home/ljochems/PrelimHurdleModel/")
 
 efb_data <- read.csv("FullData2011-18_HumanVars_NoWQ.csv")
 utm <- read.csv("FullTransectUTM.csv")
@@ -129,6 +129,7 @@ y_noNA[y_noNA >= 1-cens] <- 1-cens
 #apply to real y 
 y[y >= 1-cens] <- 1-cens
 
+#stdize<-function(x) {(x-mean(x))/(2*sd(x))}
 
 #need to fit with intercept, need to provide response variable as list
 #stack for Beta process (EFB cover)
@@ -136,8 +137,8 @@ stack.EFB_y <- inla.stack(data = list(alldata = cbind(y,NA)),
                           A = list(A_matrix, 1),
                           effects = list(s.index_mY = spde$n.spde,
                                          list(b0Y = rep(1, nrow(efb_data)),
-                                              data.frame(depth=scale(efb_data$wtr_dp_)),data.frame(typha=scale(efb_data$typ_cover)),
-                                              data.frame(boats=scale(efb_data$NEAR_DIST)), data.frame(fetch=scale(efb_data$MeanFetch)),
+                                              data.frame(depth=efb_data$wtr_dp_),data.frame(typha=efb_data$typ_cover),
+                                              data.frame(boats=efb_data$NEAR_DIST), data.frame(fetch=efb_data$MeanFetch),
                                               idY = rep(1,nrow(efb_data)), idY2 = rep(1,nrow(efb_data)),idY3 = rep(1,nrow(efb_data)),
                                               idY4 = rep(1,nrow(efb_data)))), 
                           tag = "Beta (EFB Cover)")
@@ -148,8 +149,8 @@ stack.EFB_z <- inla.stack(data = list(alldata = cbind(NA,z)),
                           A = list(A_matrix, 1),
                           effects = list(s.index_mZ = spde$n.spde,
                                          list(b0Z = rep(1, nrow(efb_data)),
-                                              data.frame(depth=scale(efb_data$wtr_dp_)),data.frame(typha=scale(efb_data$typ_cover)),
-                                              data.frame(boats=scale(efb_data$NEAR_DIST)), data.frame(fetch=scale(efb_data$MeanFetch)),
+                                              data.frame(depth=efb_data$wtr_dp_),data.frame(typha=fb_data$typ_cover),
+                                              data.frame(boats=efb_data$NEAR_DIST), data.frame(fetch=efb_data$MeanFetch),
                                               idZ = rep(1,nrow(efb_data)), idZ2 = rep(1,nrow(efb_data)),idZ3 = rep(1,nrow(efb_data)),
                                               idZ4 = rep(1,nrow(efb_data)))), 
                           tag = "Bernoulli (EFB Occurence)")
@@ -198,9 +199,9 @@ formula_all <- alldata ~ 0 + b0Y + b0Z +
 EFB.hurdlemodel.inla <- inla(formula_all,
                               data = inla.stack.data(stackm),
                               control.predictor = list(A = inla.stack.A(stackm), link = c(rep(1,length(y)), rep(2,length(z))), compute = TRUE),
-                              control.compute = list(dic = T, waic = T, config = T,return.marginals.predictor=T,
+                              control.compute = list(dic = T, waic = T, config = T,
                                                      hyperpar = T, return.marginals=T), 
-                             family = c("beta", "zeroinflatedbinomial"),
+                             family = c("beta", "zeroinflatedbinomial0"),
                               control.family = list(list(link = 'logit'), list(link = 'logit')), verbose = T)
 # control.family = list(beta.censor.value = cens) seems confusing for joint hurdlemodel distribution
 #instead just took off a little bit from 1's
@@ -210,7 +211,7 @@ EFB.hurdlemodel.inla <- inla(formula_all,
 #control.family(list(control.link('logit')))
 #control.inla = list(strategy="gaussian")?
 EFB.hurdlemodel.inla <- summary(EFB.hurdlemodel.inla)
-saveRDS(EFB.hurdlemodel.inla, "PrelimHurdleModel_logit2.rds")
+#saveRDS(EFB.hurdlemodel.inla, "PrelimHurdleModel_scale1.rds")
 #
 # #one way to save model object, but need to specify certain findings to troubleshoot
 EFB.hurdlemodel.inla.complete <- list(summary.fixed = EFB.hurdlemodel.inla$summary.fixed,
@@ -224,26 +225,88 @@ EFB.hurdlemodel.inla.complete <- list(summary.fixed = EFB.hurdlemodel.inla$summa
                                       marginals.spde2.blc = EFB.hurdlemodel.inla$marginals.spde2.blc,
                                       marginals.spde3.blc = EFB.hurdlemodel.inla$marginals.spde3.blc,
                                       internal.marginals.hyperpar = EFB.hurdlemodel.inla$internal.marginals.hyperpar)
-saveRDS(EFB.hurdlemodel.inla.complete, file="PrelimHurdleModelComplete_logit2.rds")
+saveRDS(EFB.hurdlemodel.inla.complete, file="PrelimHurdleModelComplete_noSc.rds")
 # #not sure why this isn't saving...
 #
 # #to obtain range of spatial error terms across the nodes
-# # length(EFB.hurdlemodel.inla$summary.random$spatial.field$mean)
-# # spatial_error <- range(EFB.hurdlemodel.inla$summary.random$spatial.field$mean)
-# # print("Range of Spatial Errors"); spatial_error
+length(EFB.hurdlemodel.inla$summary.random$spatial.field$mean)
+spatial_error <- range(EFB.hurdlemodel.inla$summary.random$spatial.field$mean)
+print("Range of Spatial Errors"); spatial_error
 # #
 # # # project the spatial random effect
-# # gproj <- inla.mesh.projector(mesh1)
-# # g.mean <- inla.mesh.project(gproj, EFB.hurdlemodel.inla$summary.random$spatial.field$mean)
-# # g.sd <- inla.mesh.project(gproj, EFB.hurdlemodel.inla$summary.random$spatial.field$sd)
-# # grid.arrange(levelplot(g.mean, scales=list(draw=F), xlab='', ylab='', main='mean',col.regions=terrain.colors(16)),
-# #              levelplot(g.sd, scal=list(draw=F), xla='', yla='', main='sd',col.regions=terrain.colors(16)),nrow=1)
-# # par(mfrow = c(1, 2))
+gproj <- inla.mesh.projector(mesh1)
+g.mean <- inla.mesh.project(gproj, EFB.hurdlemodel.inla$summary.random$spatial.field$mean)
+g.sd <- inla.mesh.project(gproj, EFB.hurdlemodel.inla$summary.random$spatial.field$sd)
+grid.arrange(levelplot(g.mean, scales=list(draw=F), xlab='', ylab='', main='mean',col.regions=terrain.colors(16)),
+             levelplot(g.sd, scal=list(draw=F), xla='', yla='', main='sd',col.regions=terrain.colors(16)),nrow=1)
+par(mfrow = c(1, 2))
 #
 # #not sure what's happening?
 #
 # # get the spatial parametres of the spatial random effect
-# spatial.parameters <- inla.spde2.result(inla = EFB.hurdlemodel.inla, name = "spatial.field",
+spatial.parameters <- inla.spde2.result(inla = EFB.hurdlemodel.inla, name = "spatial.field",
+                                        spde = spde,
+                                        do.transform = T)
+# # nominal variance (the sill)
+sill <- inla.emarginal(function(x) x, spatial.parameters$marginals.variance.nominal[[1]])
+sill
+# # plot posterior distribution
+plot(spatial.parameters$marginals.variance.nominal[[1]],type='l',main='Sill')
+#
+# # range
+range <- inla.emarginal(function(x) x, spatial.parameters$marginals.range.nominal[[1]])
+range
+# # plot posterior distribution
+plot(spatial.parameters$marginals.range.nominal[[1]],type='l',main='Range')
+#
+# # # nugget, doesn't seem to work
+nugget <- inla.emarginal(function(x) 1/x, EFB.hurdlemodel.inla$marginals.hyperpar$`Precision for the Gaussian observations`)
+nugget
+# # # plot posterior distribution
+plot(inla.tmarginal(function(x) 1/x, EFB.hurdlemodel.inla$marginals.hyperpar$`Precision for the Gaussian observations`),
+     type='l', main='Nugget')
+#
+#
+# # plot model residuals
+fitted <- EFB.hurdlemodel.inla$"summary.fitted.values"[,1][1:length(efb_data$hyd_bin)]
+residuals <- (fitted - efb_data$hyd_bin)
+plot(fitted,residuals,main=('Residuals vs Fitted (Including spatial term)')); abline(h=0,lty='dashed',col='red')
+
+#need to figure out how to calculate r2 for hurdle model
+observed <- efb_data$hyd_bin
+meanOb <- mean(efb_data$hyd_bin)
+numerator<- sum((fitted - meanOb)^2)
+denominator <- sum((observed - meanOb)^2)
+r2<- (numerator) / (denominator)
+print('R2');r2
+
+
+
+######---- spatial model only----###### 
+# # #model to explore spatial error deviations from intercept of response variable 
+# EFB.spatialmodel.inla <- inla(formula_spatial,
+#                        data = inla.stack.data(stackm),
+#                        control.predictor = list(A = inla.stack.A(stackm), link = c(rep(1,length(y)), rep(2,length(z))), compute = TRUE),
+#                        control.compute = list(dic = T, waic = T, config = T),family = c("beta", "zeroinflatedbinomial"),
+#                        control.family = list(list(link = 'logit'), list(link = 'logit')), verbose = T)
+# summary(EFB.spatialmodel.inla)
+# length(EFB.spatialmodel.inla$summary.random$spatial.field$mean)
+# #many more nodes in utm mesh compared to lat long mesh
+# range(EFB.spatialmodel.inla$summary.random$spatial.field$mean)
+# #to obtain range of spatial error terms across the nodes
+# 
+# # project the spatial random effect
+# gproj <- inla.mesh.projector(mesh1)
+# g.mean <- inla.mesh.project(gproj, EFB.spatialmodel.inla$summary.random$spatial.field$mean)
+# g.sd <- inla.mesh.project(gproj, EFB.spatialmodel.inla$summary.random$spatial.field$sd)
+# grid.arrange(levelplot(g.mean, scales=list(draw=F), xlab='', ylab='', main='mean',col.regions=terrain.colors(16)),
+#              levelplot(g.sd, scal=list(draw=F), xla='', yla='', main='sd',col.regions=terrain.colors(16)),nrow=1)
+# par(mfrow = c(1, 2))
+# 
+# #not sure what's happening?
+# 
+# # get the spatial parametres of the spatial random effect
+# spatial.parameters <- inla.spde2.result(inla = EFB.spatialmodel.inla, name = "spatial.field",
 #                                         spde = spde,
 #                                         do.transform = T)
 # # nominal variance (the sill)
@@ -251,90 +314,28 @@ saveRDS(EFB.hurdlemodel.inla.complete, file="PrelimHurdleModelComplete_logit2.rd
 # sill
 # # plot posterior distribution
 # plot(spatial.parameters$marginals.variance.nominal[[1]],type='l',main='Sill')
-#
+# 
 # # range
 # range <- inla.emarginal(function(x) x, spatial.parameters$marginals.range.nominal[[1]])
 # range
 # # plot posterior distribution
 # plot(spatial.parameters$marginals.range.nominal[[1]],type='l',main='Range')
-#
+# 
 # # # nugget, doesn't seem to work
-# # nugget <- inla.emarginal(function(x) 1/x, EFB.hurdlemodel.inla$marginals.hyperpar$`Precision for the Gaussian observations`)
+# # nugget <- inla.emarginal(function(x) 1/x, EFB.spatialmodel.inla$marginals.hyperpar$`Precision for the Gaussian observations`)
 # # nugget
 # # # plot posterior distribution
-# # plot(inla.tmarginal(function(x) 1/x, EFB.hurdlemodel.inla$marginals.hyperpar$`Precision for the Gaussian observations`),
+# # plot(inla.tmarginal(function(x) 1/x, EFB.spatialmodel.inla$marginals.hyperpar$`Precision for the Gaussian observations`),
 # #      type='l', main='Nugget')
-#
-#
+# 
 # # plot model residuals
-# fitted <- EFB.hurdlemodel.inla$"summary.fitted.values"[,1][1:length(efb_data$hyd_bin)]
+# fitted <- EFB.spatialmodel.inla$"summary.fitted.values"[,1][1:length(efb_data$hyd_bin)]
 # residuals <- (fitted - efb_data$hyd_bin)
 # plot(fitted,residuals,main=('Residuals vs Fitted (Including spatial term)')); abline(h=0,lty='dashed',col='red')
-
-#need to figure out how to calculate r2 for hurdle model
+# 
 # observed <- efb_data$hyd_bin
 # meanOb <- mean(efb_data$hyd_bin)
 # numerator<- sum((fitted - meanOb)^2)
 # denominator <- sum((observed - meanOb)^2)
 # r2<- (numerator) / (denominator)
 # print('R2');r2
-
-
-
-######---- spatial model only----###### 
-# #model to explore spatial error deviations from intercept of response variable 
-EFB.spatialmodel.inla <- inla(formula_spatial,
-                       data = inla.stack.data(stackm),
-                       control.predictor = list(A = inla.stack.A(stackm), link = c(rep(1,length(y)), rep(2,length(z))), compute = TRUE),
-                       control.compute = list(dic = T, waic = T, config = T),family = c("beta", "zeroinflatedbinomial"),
-                       control.family = list(list(link = 'logit'), list(link = 'logit')), verbose = T)
-summary(EFB.spatialmodel.inla)
-length(EFB.spatialmodel.inla$summary.random$spatial.field$mean)
-#many more nodes in utm mesh compared to lat long mesh
-range(EFB.spatialmodel.inla$summary.random$spatial.field$mean)
-#to obtain range of spatial error terms across the nodes
-
-# project the spatial random effect
-gproj <- inla.mesh.projector(mesh1)
-g.mean <- inla.mesh.project(gproj, EFB.spatialmodel.inla$summary.random$spatial.field$mean)
-g.sd <- inla.mesh.project(gproj, EFB.spatialmodel.inla$summary.random$spatial.field$sd)
-grid.arrange(levelplot(g.mean, scales=list(draw=F), xlab='', ylab='', main='mean',col.regions=terrain.colors(16)),
-             levelplot(g.sd, scal=list(draw=F), xla='', yla='', main='sd',col.regions=terrain.colors(16)),nrow=1)
-par(mfrow = c(1, 2))
-
-#not sure what's happening?
-
-# get the spatial parametres of the spatial random effect
-spatial.parameters <- inla.spde2.result(inla = EFB.spatialmodel.inla, name = "spatial.field",
-                                        spde = spde,
-                                        do.transform = T)
-# nominal variance (the sill)
-sill <- inla.emarginal(function(x) x, spatial.parameters$marginals.variance.nominal[[1]])
-sill
-# plot posterior distribution
-plot(spatial.parameters$marginals.variance.nominal[[1]],type='l',main='Sill')
-
-# range
-range <- inla.emarginal(function(x) x, spatial.parameters$marginals.range.nominal[[1]])
-range
-# plot posterior distribution
-plot(spatial.parameters$marginals.range.nominal[[1]],type='l',main='Range')
-
-# # nugget, doesn't seem to work
-# nugget <- inla.emarginal(function(x) 1/x, EFB.spatialmodel.inla$marginals.hyperpar$`Precision for the Gaussian observations`)
-# nugget
-# # plot posterior distribution
-# plot(inla.tmarginal(function(x) 1/x, EFB.spatialmodel.inla$marginals.hyperpar$`Precision for the Gaussian observations`),
-#      type='l', main='Nugget')
-
-# plot model residuals
-fitted <- EFB.spatialmodel.inla$"summary.fitted.values"[,1][1:length(efb_data$hyd_bin)]
-residuals <- (fitted - efb_data$hyd_bin)
-plot(fitted,residuals,main=('Residuals vs Fitted (Including spatial term)')); abline(h=0,lty='dashed',col='red')
-
-observed <- efb_data$hyd_bin
-meanOb <- mean(efb_data$hyd_bin)
-numerator<- sum((fitted - meanOb)^2)
-denominator <- sum((observed - meanOb)^2)
-r2<- (numerator) / (denominator)
-print('R2');r2
