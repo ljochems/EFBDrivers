@@ -321,9 +321,11 @@ p <- INLAutils::autoplot(EFB.hurdlemodel.inla.complete)
 #####---- try to plot spatial vs. non spatial eff sizes----#### 
 load("~/R/EFBDrivers/PrelimHurdleModelComplete_logit2.RData")
 EFB.model.inla <- EFB.hurdlemodel.inla.complete$summary.random[2:9]
+EFB.model.inla <- do.call(rbind,lapply(EFB.model.inla,unlist))
 
 load("~/R/EFBDrivers/PrelimHurdleModelComplete_NoSpat.RData")
 EFB.model.inlaNS <- EFB.hurdlemodel.inla.complete$summary.random
+EFB.model.inlaNS <- do.call(rbind,lapply(EFB.model.inlaNS,unlist))
 
 #plot effect sizes 
 THEME <- theme(axis.text.x = element_text(size = 12,colour = "black"),
@@ -331,73 +333,8 @@ THEME <- theme(axis.text.x = element_text(size = 12,colour = "black"),
                axis.title.x = element_text(vjust = -0.35),
                axis.title.y = element_text(vjust = 1.2)) + theme_bw()
 
-Efxplot <- function(modellist, sig = TRUE, ModelNames = NULL){
-  require(tidyverse);require(ggplot2)
-  graphlist <- list()
-  for(i in 1:length(modellist)){
-    model <- modellist[[i]]
-    
-    if(class(model) == "list"){
-      graph <- as.data.frame(model)
-      colnames(graph)[grepl("(0.025quant|0.975quant)$",colnames(graph))] <- c("Lower","Upper")
-      colnames(graph)[grepl("mean$",colnames(graph))] <- c("Estimate")
-      # graph <- colnames(graph) %>% dplyr::select(graph,ends_with(c("0.025quant","0.975quant"))) %>% 
-      #   rename(graph,c("Lower","Upper")) %>% 
-      # dplyr::select(graph,ends_with(graph,c("mean"))) %>% rename(graph, c("Estimate"))
-    }
-        
-    graph$Model <- i
-    graph$Factor <- rownames(graph)
-    
-    graphlist[[i]] <- graph
-    
-  }
-  
-  graph <- bind_rows(graphlist)
-  
-  graph$starloc <- NA
-  
-  min <- min(graph$Lower) #,na.rm = T
-  max <- max(graph$Upper)#,na.rm = T
-  
-  if(sig == TRUE){
-    graph$starloc <- max + (max-min)/10
-  }
-  
-  graph$Sig <- with(graph,ifelse((Lower<0&Upper<0)|(Lower>0&Upper>0),"*",""))
-  
-  graph$Model <- as.factor(graph$Model)
-  
-  if(!is.null(ModelNames)){
-    levels(graph$Model) <- ModelNames
-  }
-  
-  
-  ggplot(as.data.frame(graph),aes(x = Factor,y = Estimate,colour = Model)) + 
-    geom_point(position = position_dodge(w = 0.5)) + 
-    geom_errorbar(position = position_dodge(w = 0.5),aes(ymin = Lower,ymax = Upper),size = 0.3,width = 0.2) + 
-    geom_hline(aes(yintercept = 0),lty = 2) + THEME + labs(x = NULL) + coord_flip() + 
-    geom_text(aes(label = Sig,y = starloc),position = position_dodge(w = 0.5))
-}
-
-ModelList<- list(EFB.model.inlaNS,EFB.model.inla)
-Efxplot(ModelList,ModelNames=c("Nonspatial","Spatial"))
-
-
-#####-------test another way---#### 
-load("~/R/EFBDrivers/PrelimHurdleModelComplete_logit2.RData")
-EFB.model.inla <- EFB.hurdlemodel.inla.complete$summary.random[2:9]
-EFB.model.inla <- do.call(rbind,lapply(EFB.hurdlemodel.inla.complete$summary.random,unlist))
-
-load("~/R/EFBDrivers/PrelimHurdleModelComplete_NoSpat.RData")
-EFB.model.inlaNS <- EFB.hurdlemodel.inla.complete$summary.random
-EFB.model.inlaNS <- do.call(rbind,lapply(EFB.hurdlemodel.inla.complete$summary.random,unlist))
-
-#plot effect sizes 
-THEME <- theme(axis.text.x = element_text(size = 12,colour = "black"),
-               axis.text.y = element_text(size = 12, colour = "black"),
-               axis.title.x = element_text(vjust = -0.35),
-               axis.title.y = element_text(vjust = 1.2)) + theme_bw()
+library(ggdist)
+#theme_set(theme_ggdist())
 
 Efxplot <- function(modellist, sig = TRUE, ModelNames = NULL){
   require(tidyverse);require(ggplot2)
@@ -407,7 +344,7 @@ Efxplot <- function(modellist, sig = TRUE, ModelNames = NULL){
     
     if(class(model) == "matrix"){
       graph <- as.data.frame(model)
-      colnames(graph)[which(colnames(graph)%in%c("0.025quant","0.975quant"))] <- c("Lower","Upper")
+      colnames(graph)[which(colnames(graph)%in%c("0.025quant","0.5quant","0.975quant"))] <- c("Lower","Middle","Upper") 
       colnames(graph)[which(colnames(graph)%in%c("mean"))] <- c("Estimate")
     }
     
@@ -423,14 +360,14 @@ Efxplot <- function(modellist, sig = TRUE, ModelNames = NULL){
   
   graph$starloc <- NA
   
-  min <- min(graph$Lower) #,na.rm = T
-  max <- max(graph$Upper)#,na.rm = T
+  min <- min(graph$Lower,na.rm = T) #,na.rm = T
+  max <- max(graph$Upper,na.rm = T)#,na.rm = T
   
   if(sig == TRUE){
     graph$starloc <- max + (max-min)/10
   }
   
-  graph$Sig <- with(graph,ifelse((Lower<0&Upper<0)|(Lower>0&Upper>0),"*",""))
+  #graph$Sig <- with(graph,ifelse((Lower<0&Upper<0)|(Lower>0&Upper>0),"*",""))
   
   graph$Model <- as.factor(graph$Model)
   
@@ -440,12 +377,42 @@ Efxplot <- function(modellist, sig = TRUE, ModelNames = NULL){
   
   
   ggplot(as.data.frame(graph),aes(x = Factor,y = Estimate,colour = Model)) + 
-    geom_point(position = position_dodge(w = 0.5)) + 
-    geom_errorbar(position = position_dodge(w = 0.5),aes(ymin = Lower,ymax = Upper),size = 0.3,width = 0.2) + 
-    geom_hline(aes(yintercept = 0),lty = 2) + THEME + labs(x = NULL) + coord_flip() + 
-    geom_text(aes(label = Sig,y = starloc),position = position_dodge(w = 0.5))
+    geom_pointinterval(position = position_dodge(w = 0.5), aes(ymin=Lower,ymax=Upper),size=7,width=5) + 
+    # geom_point(position = position_dodge(w = 0.5)) + 
+    # geom_errorbar(position = position_dodge(w = 0.5),aes(ymin = Lower,ymax = Upper),size = 0.8,width = 0.6) +
+    #geom_errorbar(position = position_dodge(w = 0.5),aes(ymin=Estimate+Middle,ymax=Estimate-Middle),size = 0.9,width = 0.3) +
+    THEME + labs(x = NULL, y = "Effect Size (Odds Ratio)") + geom_hline(aes(yintercept = 1),lty = 2) +
+    ylim(0.5,1.075) + coord_flip() #+ 
+    #geom_text(aes(label = Sig,y = starloc),position = position_dodge(w = 0.5))
 }
 
 ModelList<- list(EFB.model.inlaNS,EFB.model.inla)
-Efxplot(ModelList,ModelNames=c("Nonspatial","Spatial"))
+plot_nT <- Efxplot(ModelList,ModelNames=c("Nonspatial","Spatial"))
+#works! need to plogis() everything tho 
 
+####----plogis plot----#### 
+depth_func <- function(x) {(plogis(x)*sd(efb_data$wtr_dp_))/mean(efb_data$wtr_dp_)} #/sd(efb_data$wtr_dp_)
+typha_func <- function(x) {(plogis(x)*sd(efb_data$typh_cm))/mean(efb_data$typh_cm)} #/sd(efb_data$typh_cm)
+boat_func <- function(x)  {(plogis(x)*sd(efb_data$NEAR_DIST))/mean(efb_data$NEAR_DIST)} #/sd(efb_data$NEAR_DIST)
+fetch_func <- function(x) {(plogis(x)*sd(efb_data$MeanFetch))/mean(efb_data$MeanFetch)} #/sd(efb_data$MeanFetch)
+
+depth_func <- function(x) {plogis(x)/sd(efb_data$wtr_dp_)} #sd(efb_data$wtr_dp_)
+typha_func <- function(x) {plogis(x)/sd(efb_data$typh_cm)} #sd(efb_data$typh_cm)
+boat_func <- function(x)  {plogis(x)/sd(efb_data$NEAR_DIST)} #/sd(efb_data$NEAR_DIST)
+fetch_func <- function(x) {plogis(x)/sd(efb_data$MeanFetch)}#/sd(efb_data$MeanFetch)
+
+plogs_func <- function (x) {
+  df <- depth_func(x[1:2,]) 
+  tf <- typha_func(x[3:4,])
+  bf <- boat_func(x[5:6,])
+  ff <- fetch_func(x[7:8,])
+  final <- rbind(df,tf,bf,ff)
+  return(final)
+}
+
+EFB.model.inlaPL <- plogs_func(EFB.model.inla)
+EFB.model.inlaNS_PL <- plogs_func(EFB.model.inlaNS)
+
+ModelList_T <- list(EFB.model.inlaNS_PL,EFB.model.inlaPL)
+
+plot_T <- Efxplot(ModelList_T,ModelNames=c("Nonspatial","Spatial"))
