@@ -105,7 +105,12 @@ ggplot() +
   labs(x = "UTM Easting (m)") + 
   labs(y = "UTM Northing (m)")
 
+# y is cover 
+#looks good without spatial term 
 plot(inla.tmarginal(function(x) x, EFB.hurdlemodel.inla.complete$marginals.fixed$b0Y), type ='l')
+# z is occurrence 
+# still kind of whacky without spatial terms 
+# and crazy distrbution? tails beyond +/- 100 
 plot(inla.tmarginal(function(x) x, EFB.hurdlemodel.inla.complete$marginals.fixed$b0Z), type ='l')
 
 plot(inla.tmarginal(function(x) x, EFB.hurdlemodel.inla.complete$marginals.random$idY$index.1), type ='l')
