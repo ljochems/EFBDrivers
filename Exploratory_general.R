@@ -46,7 +46,7 @@ efb_data %>%
 #only realatively high cor is between wtr dp and year so....
 #let's check it out 
 plot(efb_data$wtr_dp_~efb_data$year)
-#pretty striking... certainly a function of rising water levels over the time period
+#pretty striking... a function of rising water levels over the time period
 #thus they measured deeper depths as years reach peak of 2019.... 
 #check with lm 
 depth_yr_mod <- lm(efb_data$wtr_dp_~log(efb_data$year))
@@ -54,6 +54,8 @@ depth_yr_mod <- lm(efb_data$wtr_dp_~log(efb_data$year))
 
 
 plot(efb_data$Hydrc__~efb_data$year)
+#need to include at least as covariate (maybe temporal random effects?)
+#more efb observed over the time period by year, except for weird 2013 
 
 GLbuffer <- shapefile("Great_Lakes_Buffer.shp")
 proj4string(GLbuffer) <- "+proj=longlat +datum=WGS84 +no_defs"
@@ -74,8 +76,7 @@ prob = exp(eta)/(1 + exp(eta))
 
 y = rbinom(n, size = Ntrials, prob = prob)
 is.zero = (y == 0)
-while(sum(is.zero) > 0)
-{
+while(sum(is.zero) > 0) {
   y[is.zero] = rbinom(sum(is.zero), size = Ntrials[is.zero], prob = prob[is.zero])
   is.zero = (y == 0)
 }
@@ -92,3 +93,10 @@ data = list(y=y,z=z)
 formula = y ~ 1+z
 result1 = inla(formula, family = "zeroinflatedbinomial1", data = data, Ntrials=Ntrials)
 summary(result1)
+
+
+plot(inla.tmarginal(function(x) x, result0$marginals.fixed$`(Intercept)`), type ='l')
+plot(inla.tmarginal(function(x) x, result1$marginals.fixed$`(Intercept)`), type ='l')
+#only difference I see bw zi0 and zi1 is that zi1 obtained higher values for estimates 
+#no whacky marginal distributions... 
+#time to check out simpler models 
