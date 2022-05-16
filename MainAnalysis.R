@@ -162,34 +162,21 @@ stackm <- inla.stack(stack.EFB_y,stack.EFB_z)
 ######----model formulation and fitting----#### 
 #one hurdle model with spatial effects only
 # so we obtain range, sill, nugget 
-formula_spatial <- alldata ~ 0 + b0Y + b0Z +
-  f(s.index._mY,model=spde) +
-  f(s.index._mZ, copy = "s.index._mY", hyper = list(beta = list(fixed = FALSE)))
-
-# formula_all <- alldata ~ 0 + b0Y + b0Z + 
-#   depth + typha + boats + fetch +
+# formula_spatial <- alldata ~ 0 + b0Y + b0Z +
 #   f(s.index._mY,model=spde) +
-#   f(s.index._mZ, copy = "s.index._mY", hyper = list(beta = list(fixed = FALSE))) + 
-#   f(idY, depth, hyper = FALSE) + 
-#   f(idZ, depth, hyper = FALSE) +
-#   f(idY2, typha, hyper = FALSE) + 
-#   f(idZ2, typha, hyper = FALSE) +
-#   f(idY3, boats, hyper = FALSE) + 
-#   f(idZ3, boats, hyper = FALSE) +
-#   f(idY4, fetch, hyper = FALSE) + 
-#   f(idZ4, fetch, hyper = FALSE) 
-#consider adding human mod binomial predictor (model='iid')
-#as juanmi did in his paper 
+#   f(s.index._mZ, copy = "s.index._mY", hyper = list(beta = list(fixed = FALSE)))
 
-# formula_all <- alldata ~ 0 + b0Y + b0Z +
-#   f(idY, depth, hyper = FALSE) +
-#   f(idZ, depth, hyper = FALSE) +
-#   f(idY2, typha, hyper = FALSE) +
-#   f(idZ2, typha, hyper = FALSE) +
-#   f(idY3, boats, hyper = FALSE) +
-#   f(idZ3, boats, hyper = FALSE) +
-#   f(idY4, fetch, hyper = FALSE) +
-#   f(idZ4, fetch, hyper = FALSE)
+formula_all <- alldata ~ 0 + b0Y + b0Z +
+  f(s.index._mY, model=spde) +
+  f(s.index._mZ, copy = "s.index._mY", hyper = list(beta = list(fixed = FALSE))) +
+  f(idY, depth, hyper = list(prec = list(prior = "pc.prec", param = c(0.5, 0.005)))) +
+  f(idZ, depth, hyper = list(prec = list(prior = "pc.prec", param = c(0.5, 0.005)))) +
+  f(idY2, typha, hyper = list(prec = list(prior = "pc.prec", param = c(0.5, 0.005)))) +
+  f(idZ2, typha, hyper = list(prec = list(prior = "pc.prec", param = c(0.5, 0.005)))) +
+  f(idY3, boats, hyper = list(prec = list(prior = "pc.prec", param = c(0.5, 0.005)))) +
+  f(idZ3, boats, hyper = list(prec = list(prior = "pc.prec", param = c(0.5, 0.005)))) +
+  f(idZ4, fetch, hyper = list(prec = list(prior = "pc.prec", param = c(0.5, 0.005)))) +
+  f(idY4, fetch, hyper = list(prec = list(prior = "pc.prec", param = c(0.5, 0.005))))
 # # #consider adding human mod binomial predictor (model='iid')
 
 
@@ -223,7 +210,7 @@ EFB.hurdlemodel.inla.complete <- list(summary.fixed = EFB.hurdlemodel.inla$summa
                                       marginals.spde2.blc = EFB.hurdlemodel.inla$marginals.spde2.blc,
                                       marginals.spde3.blc = EFB.hurdlemodel.inla$marginals.spde3.blc,
                                       internal.marginals.hyperpar = EFB.hurdlemodel.inla$internal.marginals.hyperpar)
-save(EFB.hurdlemodel.inla.complete, file="HurdleModelComplete_SpatOnly.RData")
+save(EFB.hurdlemodel.inla.complete, file="HurdleModelComplete_PCPriors.RData")
 # #not sure why this isn't saving...
 #
 # #to obtain range of spatial error terms across the nodes
@@ -242,9 +229,15 @@ par(mfrow = c(1, 2))
 # #not sure what's happenin with these projections?? 
 #
 # # get the spatial parameters of the spatial random effect
-spatial.parameters <- inla.spde2.result(inla = EFB.hurdlemodel.inla, name = "s.index._mY",
+# spatial.parameters <- inla.spde2.result(inla = EFB.hurdlemodel.inla, name = "s.index._mY",
+#                                         spde = spde,
+#                                         do.transform = T)
+#do during post modeling 
+spatial.parameters <- inla.spde2.result(inla = EFB.hurdlemodel.inla,
+                                        name = "s.index._mY",
                                         spde = spde,
                                         do.transform = T)
+
 # # nominal variance (the sill)
 sill <- inla.emarginal(function(x) x, spatial.parameters$marginals.variance.nominal[[1]])
 sill
@@ -261,25 +254,12 @@ range
 # # plot posterior distribution
 plot(spatial.parameters$marginals.range.nominal[[1]],type='l',main='Range')
 
-nugget <- inla.emarginal(function(x) 1/x, EFB.hurdlemodel.inla$marginals.hyperpar$`Precision for the Gaussian observations`)
+nugget <- inla.emarginal(function(x) 1/x, EFB.hurdlemodel.inla.complete$marginals.hyperpar$`precision parameter for the beta observations`)
 nugget
-
-# nugget, doesn't seem to work. get this error: 
-# Error in seq.default(xmin, xmax, len = n) : 
-#   'from' must be a finite number
-# Calls: inla.emarginal -> inla.smarginal -> seq -> seq.default
-# In addition: Warning messages:
-#   1: In max(marginal$y) : no non-missing arguments to max; returning -Inf
-# 2: In min(x, na.rm = na.rm) :
-#   no non-missing arguments to min; returning Inf
-# 3: In max(x, na.rm = na.rm) :
-#   no non-missing arguments to max; returning -Inf
-# 4: In min(m$x) : no non-missing arguments to min; returning Inf
-# 5: In max(m$x) : no non-missing arguments to max; returning -Inf
-# Execution halted
+# [1] 0.7071535
 
 # # # plot posterior distribution
-plot(inla.tmarginal(function(x) 1/x, EFB.hurdlemodel.inla$marginals.hyperpar$`Precision for the Gaussian observations`),
+plot(inla.tmarginal(function(x) 1/x, EFB.hurdlemodel.inla.complete$marginals.hyperpar$`precision parameter for the beta observations`),
      type='l', main='Nugget')
 #
 
@@ -295,8 +275,6 @@ numerator<- sum((fitted - meanOb)^2)
 denominator <- sum((observed - meanOb)^2)
 r2<- (numerator) / (denominator)
 print('R2');r2
-
-
 
 ######---- spatial model only----###### 
 # # #model to explore spatial error deviations from intercept of response variable 
