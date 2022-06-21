@@ -100,3 +100,27 @@ plot(inla.tmarginal(function(x) x, result1$marginals.fixed$`(Intercept)`), type 
 #only difference I see bw zi0 and zi1 is that zi1 obtained higher values for estimates 
 #no whacky marginal distributions... 
 #time to check out simpler models 
+
+
+######----checking out other scales beyond quadrat (transect, or veg zon)----#### 
+require('leaflet')
+require('sp')
+
+coordinates(efb_data) <- ~UTM_X + UTM_Y
+proj4string(efb_data) <- "+proj=utm +zone=16,17 +datum=WGS84 +units=m +no_defs +ellps=WGS84 +towgs84=0,0,0"
+
+quad_map <- leaflet(efb_data) %>%
+  addProviderTiles('Esri.WorldImagery') %>% 
+  addCircles(lng = ~UTM_X, lat = ~UTM_Y,)
+
+
+map5 <- leaflet() %>% 
+  addProviderTiles('Esri.WorldImagery') %>%
+  addRasterImage(preds_sf_new) %>% 
+  addLegend(pal = pal, values = values(preds_sf_new),
+            title="Prob. of EFB Presence (%)") %>% 
+  addScaleBar(position="bottomright") %>% 
+  addControl(html=north.arrow.file,
+             position="bottomleft",
+             className="fieldset{}") %>%
+  addMiniMap()
